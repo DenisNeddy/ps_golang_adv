@@ -3,8 +3,9 @@ package main
 import (
 	"3-validation-api/config"                  // Наш пакет конфигурации
 	handler "3-validation-api/internal/verify" // Наш пакет обработчиков
-	"fmt"                                      // Для вывода в консоль
-	"net/http"                                 // Для HTTP сервера
+	"3-validation-api/storage"
+	"fmt"      // Для вывода в консоль
+	"net/http" // Для HTTP сервера
 )
 
 func main() {
@@ -16,9 +17,12 @@ func main() {
 		Address:  "smtp.gmail.com:587",   // SMTP адрес и порт
 	}
 
+	// Инициализация хранилища с JSON  файлом
+	storage := storage.NewStorage("verififcatons.json")
+
 	// Создание обработчика verify с передачей конфигурации
 
-	verifyHandler := handler.NewVerifyHandler(cfg)
+	verifyHandler := handler.NewVerifyHandler(cfg, storage)
 
 	// Создаем мультиплексора маршрутов
 
@@ -30,8 +34,8 @@ func main() {
 	mux.HandleFunc("GET /verify/{hash}", verifyHandler.Verify)
 
 	// Вывод сообщения о запуске сервера
-	fmt.Println("Server starting on :8080")
+	fmt.Println("Server starting on :8081")
 	// Запуск HTTP сервера на порту 8080
-	http.ListenAndServe(":8080", mux)
+	http.ListenAndServe(":8081", mux)
 
 }

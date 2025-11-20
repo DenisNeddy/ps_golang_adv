@@ -6,9 +6,11 @@ import (
 	"encoding/json" // Для работы с JSON
 	"fmt"           // Для форматирования строк
 	"net/http"      // Для работы с HTTP
-	"net/smtp"      // Для отправки email через SMTP
+	"net/mail"
+	"net/smtp" // Для отправки email через SMTP
 
 	"3-validation-api/config" // Импорт нашего пакета config
+	"3-validation-api/storage"
 
 	"github.com/jordan-wright/email" // Импорт внешней библиотеки для email
 )
@@ -17,12 +19,28 @@ import (
 type VerifyHandler struct {
 	// Поле cfg хранит указатель на конфигурацию
 	cfg *config.Config
+
+	storage *storage.Storage
 }
 
 // Конструктор для VerifyHandler
-func NewVerifyHandler(cfg *config.Config) *VerifyHandler {
+func NewVerifyHandler(cfg *config.Config, storage *storage.Storage) *VerifyHandler {
 	// Возвращает указатель на новый VerifyHandler с переданной конфигурацией
-	return &VerifyHandler{cfg: cfg}
+	return &VerifyHandler{
+		cfg:     cfg,
+		storage: storage,
+	}
+}
+
+// SendRequest структуры для запроса отправки verification email
+
+type SendRequest struct {
+	Email string `json:"email"`
+}
+
+// VerifyResponse структура для ответа проверки hash
+type VerifyResponse struct {
+	Valid bool `json:"valid"`
 }
 
 // Обработчик для отправки verification email
@@ -35,42 +53,49 @@ func (h *VerifyHandler) Send(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Объявление анонимной структуры для парсинга JSON запроса
-	var req struct {
-		// Поле Email для получения email из JSON
-		Email string `json:"email"`
-	}
+	// Декодирование JSON тела запроса
 
-	// Парсинг JSON тела запроса в структуру req
-
+	var req SendRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		// Если ошибка парсинага - возвращаем ошибку 400
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}
 
-	// Генерация хеша для verifaication ссылки
+	// Валидация email адреса
+
+	if _, err := mail.ParseAddress(req.Email); err != nil {
+		http.Error(w, "Invalid email address", http.StatusBadRequest)
+		return
+	}
+
+	// Генерация уникального hash
 
 	hash, err := generateHash()
-
 	if err != nil {
-		// Если ошибка генерации - возвращаем ошибку 500
-		http.Error(w, "Error generating hash", http.StatusInternalServerError)
+		http.Error(w, "Error generation hash", http.StatusInternalServerError)
+		return
+	}
+
+	// Сохранение данных в хранилище и JSON файл
+	if err := h.storage.Save(req.Email, hash); err != nil {
+		http.Error(w, "Error saving verification data", http.StatusInternalServerError)
 		return
 	}
 
 	// Отправка verification email
 	if err := h.sendEmail(req.Email, hash); err != nil {
-		// Если ошибка отправки - возвращаем ошибку 500
 		http.Error(w, "Error sending email", http.StatusInternalServerError)
 		return
 	}
 
-	// Кодирование успешного ответа в JSON и отправка клиенту
+	// Успешный ответ
+
+	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
-		"message": "Verification email sent", // Сообщение об успехе
-		"hash":    hash,                      // Сгенерированный хеш
+		"message": "Verififcation email sent",
+		"hash":    hash,
 	})
+
 }
 
 // Вспомогательный метод для отправки email
@@ -87,7 +112,11 @@ func (h *VerifyHandler) sendEmail(to, hash string) error {
 
 	//  Установка текстового содержимого письма с verification ссылкой
 
-	e.Text = []byte(fmt.Sprintf("Verify your email: http://localhost:8080/verify/%s", hash))
+	// Формирование verification ссылки(порт 8081 согласно ТЗ)
+
+	verificationURL := fmt.Sprintf("http://localhost:8081/verify/%s", hash)
+
+	e.Text = []byte(fmt.Sprintf("Verify your email: http://localhost:8080/verify/%s", verificationURL))
 
 	// Создание SMTP аутентификации
 
@@ -111,12 +140,25 @@ func (h *VerifyHandler) Verify(w http.ResponseWriter, r *http.Request) {
 	// Получение значения хеша из URL пути (часть {hash})
 	hash := r.PathValue("hash")
 
-	// Кодирование успешного ответа в JSON и отправка клиенту
+	if hash == "" {
+		http.Error(w, "Hash is required", http.StatusBadRequest)
+		return
+	}
 
-	json.NewEncoder(w).Encode(map[string]string{
-		"message": "Email verified", // Сообщение подтверждении
-		"hash":    hash,             // Хеш который был подвержден
-	})
+	// Проверка существования hash в хранинилще
+	_, exists := h.storage.Get(hash)
+	response := VerifyResponse{Valid: exists}
+
+	// Если hash найден - удаляем запись
+
+	if exists {
+		h.storage.Delete(hash)
+	}
+
+	// Возвращем результат проверки
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
 }
 
 // Функция для генерации случайного хеша
