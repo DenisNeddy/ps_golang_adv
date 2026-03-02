@@ -86,7 +86,7 @@ func (h *Handler) GetProduct(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
-			http.Error(w, "Product not found", http.StatusInternalServerError)
+			http.Error(w, "Product not found", http.StatusNotFound)
 			return
 		}
 	}

@@ -46,8 +46,8 @@ func main() {
 
 	mux.HandleFunc("POST /products", productHandler.CreateProduct)
 	mux.HandleFunc("GET /products/{id}", productHandler.GetProduct)
-	mux.HandleFunc("PUT /products{id}", productHandler.UpdateProduct)
-	mux.HandleFunc("DELETE /products{id}", productHandler.DeleteProduct)
+	mux.HandleFunc("PUT /products/{id}", productHandler.UpdateProduct)
+	mux.HandleFunc("DELETE /products/{id}", productHandler.DeleteProduct)
 
 	log.Printf("Server starting on %s", cfg.ServerPort)
 	handler := loggerMiddleware.Middleware(mux)
