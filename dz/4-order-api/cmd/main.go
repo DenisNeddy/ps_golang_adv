@@ -3,6 +3,7 @@ package main
 import (
 	"4-order-api/config"
 	"4-order-api/database"
+	"4-order-api/internal/middleware"
 	"4-order-api/internal/product"
 	"log"
 	"net/http"
@@ -28,6 +29,8 @@ func main() {
 		log.Fatalf("Migration error: %v", err)
 	}
 
+	loggerMiddleware := middleware.NewLogger()
+
 	// 4. Создаем handler для продуктов
 
 	productHandler := product.NewHandler(db)
@@ -42,12 +45,13 @@ func main() {
 	})
 
 	mux.HandleFunc("POST /products", productHandler.CreateProduct)
-	mux.HandleFunc("GET /products", productHandler.GetProduct)
-	mux.HandleFunc("PUT /products", productHandler.UpdateProduct)
-	mux.HandleFunc("DELETE /products", productHandler.DeleteProduct)
+	mux.HandleFunc("GET /products/{id}", productHandler.GetProduct)
+	mux.HandleFunc("PUT /products{id}", productHandler.UpdateProduct)
+	mux.HandleFunc("DELETE /products{id}", productHandler.DeleteProduct)
 
 	log.Printf("Server starting on %s", cfg.ServerPort)
-	if err := http.ListenAndServe(cfg.ServerPort, mux); err != nil {
+	handler := loggerMiddleware.Middleware(mux)
+	if err := http.ListenAndServe(cfg.ServerPort, handler); err != nil {
 		log.Fatalf("Server error: %v", err)
 	}
 }
