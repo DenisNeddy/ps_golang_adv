@@ -156,6 +156,7 @@ func (h *Handler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Формируем ответ
+	//
 
 	response := ProductResponse{
 		ID:          product.ID,
