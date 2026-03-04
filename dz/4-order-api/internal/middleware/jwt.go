@@ -35,6 +35,7 @@ func (m *JWTMiddleware) Authenticate(next http.Handler) http.Handler {
 		authHeader := r.Header.Get("Authorization")
 		if authHeader == "" {
 			m.respondError(w, "Missing Authorization header", http.StatusUnauthorized)
+			return
 		}
 
 		// 2. Проверяем формат "Bearer <token>"

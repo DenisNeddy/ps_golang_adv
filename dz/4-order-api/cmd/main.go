@@ -12,54 +12,46 @@ import (
 
 func main() {
 
-	// 1. Загрузка конйигурации
-
+	// 1. Загрузка конфигурации
 	cfg := config.NewConfig()
 
 	// 2. Подключение к базе данных
-
 	db, err := database.Connect(cfg)
-	authHandler := auth.NewHandler(db, cfg)
-
 	if err != nil {
 		log.Fatalf("Database connection error: %v", err)
 	}
 
-	// 3.Выполнение миграций
-
+	// 3. Выполнение миграций
 	if err := database.Migrate(db); err != nil {
 		log.Fatalf("Migration error: %v", err)
 	}
 
-	loggerMiddleware := middleware.NewLogger()
-
-	// 4. Создаем handler для продуктов
-
+	// 4. Создаём handlers
+	authHandler := auth.NewHandler(db, cfg)
 	productHandler := product.NewHandler(db)
 
-	// 5. Настройка HTTP сервера (пока пустой)
-
+	// 5. Создаём middleware
+	loggerMiddleware := middleware.NewLogger()
 	jwtMiddleware := middleware.NewJWTMiddleware(cfg.JWTSecret)
 
-	// Публичные эндпоинты (без авторизации)
+	// 6. Создаём ОДИН мультиплексор для всех маршрутов
 	mux := http.NewServeMux()
+
+	// 7. Регистрируем публичные эндпоинты (без авторизации)
 	mux.HandleFunc("POST /auth/send", authHandler.SendSMS)
 	mux.HandleFunc("POST /auth/verify", authHandler.VerifyCode)
-
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("OK"))
 	})
 
-	protectedMux := http.NewServeMux()
+	// 8. Регистрируем защищённые эндпоинты продуктов через middleware
+	mux.Handle("POST /products", jwtMiddleware.Authenticate(http.HandlerFunc(productHandler.CreateProduct)))
+	mux.Handle("GET /products/{id}", jwtMiddleware.Authenticate(http.HandlerFunc(productHandler.GetProduct)))
+	mux.Handle("PUT /products/{id}", jwtMiddleware.Authenticate(http.HandlerFunc(productHandler.UpdateProduct)))
+	mux.Handle("DELETE /products/{id}", jwtMiddleware.Authenticate(http.HandlerFunc(productHandler.DeleteProduct)))
 
-	protectedMux.HandleFunc("POST /products", productHandler.CreateProduct)
-	protectedMux.HandleFunc("GET /products/{id}", productHandler.GetProduct)
-	protectedMux.HandleFunc("PUT /products/{id}", productHandler.UpdateProduct)
-	protectedMux.HandleFunc("DELETE /products/{id}", productHandler.DeleteProduct)
-
-	protectedMux.Handle("/products/", jwtMiddleware.Authenticate(mux))
-
+	// 9. Запускаем сервер с middleware логирования
 	log.Printf("Server starting on %s", cfg.ServerPort)
 	handler := loggerMiddleware.Middleware(mux)
 	if err := http.ListenAndServe(cfg.ServerPort, handler); err != nil {

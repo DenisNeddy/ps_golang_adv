@@ -63,7 +63,7 @@ func (h *Handler) SendSMS(w http.ResponseWriter, r *http.Request) {
 
 	tenMinutesAgo := time.Now().Add(-10 * time.Minute)
 
-	h.db.Model(&models.Session{}).Where("phonr = ? AND created_at > ?", req.Phone, tenMinutesAgo).Count(&recentSessions)
+	h.db.Model(&models.Session{}).Where("phone = ? AND created_at > ?", req.Phone, tenMinutesAgo).Count(&recentSessions)
 
 	if recentSessions >= 3 {
 		http.Error(w, "Too many requests. Try again later", http.StatusTooManyRequests)
