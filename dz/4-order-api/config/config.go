@@ -10,6 +10,7 @@ import (
 type Config struct {
 	Db         DbConfig
 	ServerPort string
+	JWTSecret  string
 }
 
 type DbConfig struct {
@@ -27,5 +28,6 @@ func NewConfig() *Config {
 			Dsn: os.Getenv("DSN"),
 		},
 		ServerPort: ":8082",
+		JWTSecret:  os.Getenv("JWT_SECRET"),
 	}
 }
