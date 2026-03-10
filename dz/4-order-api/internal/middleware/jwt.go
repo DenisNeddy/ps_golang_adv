@@ -97,3 +97,5 @@ func (m *JWTMiddleware) respondError(w http.ResponseWriter, message string, stat
 		"error": message,
 	})
 }
+
+// New Func
