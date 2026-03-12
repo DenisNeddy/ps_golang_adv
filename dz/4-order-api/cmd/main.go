@@ -5,6 +5,7 @@ import (
 	"4-order-api/database"
 	"4-order-api/internal/auth"
 	"4-order-api/internal/middleware"
+	"4-order-api/internal/order"
 	"4-order-api/internal/product"
 	"log"
 	"net/http"
@@ -29,6 +30,7 @@ func main() {
 	// 4. Создаём handlers
 	authHandler := auth.NewHandler(db, cfg)
 	productHandler := product.NewHandler(db)
+	orderHandler := order.NewHandler(db)
 
 	// 5. Создаём middleware
 	loggerMiddleware := middleware.NewLogger()
@@ -50,6 +52,10 @@ func main() {
 	mux.Handle("GET /products/{id}", jwtMiddleware.Authenticate(http.HandlerFunc(productHandler.GetProduct)))
 	mux.Handle("PUT /products/{id}", jwtMiddleware.Authenticate(http.HandlerFunc(productHandler.UpdateProduct)))
 	mux.Handle("DELETE /products/{id}", jwtMiddleware.Authenticate(http.HandlerFunc(productHandler.DeleteProduct)))
+
+	mux.Handle("POST /order", jwtMiddleware.Authenticate(http.HandlerFunc(orderHandler.CreateOrder)))
+	mux.Handle("GET /order/{id}", jwtMiddleware.Authenticate(http.HandlerFunc(orderHandler.GetOrder)))
+	mux.Handle("Get /my-orders", jwtMiddleware.Authenticate(http.HandlerFunc(orderHandler.GetMyOrders)))
 
 	// 9. Запускаем сервер с middleware логирования
 	log.Printf("Server starting on %s", cfg.ServerPort)

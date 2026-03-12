@@ -24,7 +24,12 @@ func Connect(cfg *config.Config) (*gorm.DB, error) {
 }
 
 func Migrate(db *gorm.DB) error {
-	err := db.AutoMigrate(&models.Product{})
+	err := db.AutoMigrate(
+		&models.User{},
+		&models.Product{},
+		&models.Session{},
+		&models.Order{},
+	)
 
 	if err != nil {
 		return fmt.Errorf("migration failed: %w", err)
